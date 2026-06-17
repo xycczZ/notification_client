@@ -45,6 +45,14 @@ export const useNotificationStore = defineStore('notification', () => {
       unsubscribeConnection?.()
 
       unsubscribeMessage = websocketService.onMessage((notification) => {
+        // 带真实 DB id 的 Notification 可能由 history 拉取与实时推送重复到达，
+        // 用 id 去重；aggregate 无 id，不参与去重。实时通知用的是 Date.now()，
+        // 不会与 DB 真实 id 冲突。
+        if ('id' in notification) {
+          if (notifications.value.some(n => 'id' in n && n.id === notification.id)) {
+            return
+          }
+        }
         notifications.value.unshift(notification)
         if (notifications.value.length > 1000) {
           notifications.value = notifications.value.slice(0, 1000)
@@ -53,10 +61,23 @@ export const useNotificationStore = defineStore('notification', () => {
 
       unsubscribeConnection = websocketService.onConnectionChange((connected) => {
         isConnected.value = connected
+        // 自动重连成功后补拉离线期间漏掉的通知。首次连接不经过这里
+        // （回调在 await 成功后才注册），由下方 requestLatest 兜住。
+        if (connected) {
+          requestLatest()
+        }
       })
+
+      // 首次连接：拉取最近一页作为初始数据。
+      requestLatest()
     }
 
     return success
+  }
+
+  function requestLatest() {
+    // last_id=0 即取最新一页；page_size 后端 clamp 到 [15,50]，传 20。
+    websocketService.requestMore(0, 20)
   }
 
   function disconnect() {

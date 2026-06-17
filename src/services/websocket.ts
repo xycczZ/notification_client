@@ -87,7 +87,9 @@ class WebSocketService {
         digest: '',
         title: payload.message || payload.title || 'Notification',
         content: JSON.stringify(payload),
-        level_name: payload.level_name || 'ERROR',
+        // 日志响应一定带 level_name；自定义通知（/notifications）的响应体只有
+        // title/content，缺失 level_name 时按后端入库逻辑归类为 NOTIFY。
+        level_name: payload.level_name || 'NOTIFY',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -114,7 +116,7 @@ class WebSocketService {
           digest: String(item.digest ?? ''),
           title: String(item.title ?? item.message ?? 'Notification'),
           content: typeof item.content === 'string' ? item.content : JSON.stringify(item.content ?? item),
-          level_name: String(item.level_name ?? 'ERROR'),
+          level_name: String(item.level_name ?? 'NOTIFY'),
           created_at: String(item.created_at ?? new Date().toISOString()),
           updated_at: String(item.updated_at ?? item.created_at ?? new Date().toISOString())
         }

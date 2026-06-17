@@ -1,4 +1,19 @@
 import { invoke } from '@tauri-apps/api/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
+
+/**
+ * 用系统默认浏览器打开外部 URL。
+ * Tauri 环境下走 opener 插件（权限 scope 覆盖 http/https/mailto/tel），
+ * 浏览器开发模式下 fallback 到 window.open。
+ */
+export async function openExternalUrl(url: string): Promise<void> {
+  try {
+    await openUrl(url)
+  } catch (error) {
+    console.warn('Tauri opener unavailable, falling back to window.open:', error)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
 
 async function sendTauriNotification(title: string, body: string) {
   await invoke('plugin:notification|notify', {
