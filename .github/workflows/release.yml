@@ -1,0 +1,45 @@
+name: release
+
+# 仅在打 tag（v 开头）时触发，最省 Actions 额度
+on:
+  push:
+    tags:
+      - 'v*'
+
+# 同一个 tag 重复推送时，取消上一次正在跑的构建
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Cargo 依赖
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: 安装前端依赖
+        run: bun install --frozen-lockfile
+
+      # tauri-action 会自动执行 beforeBuildCommand(bun run build) 并调用 tauri build
+      - name: 构建 Windows 安装包
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: '${{ github.ref_name }}'
+          releaseDraft: true
+          prerelease: false
