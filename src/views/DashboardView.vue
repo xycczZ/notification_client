@@ -50,7 +50,10 @@ function getLevelColor(level: string): string {
 
 function formatTime(dateStr: string): string {
   const date = new Date(dateStr)
-  return date.toLocaleTimeString()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  // 前缀补上 MM-DD，保留原有的 toLocaleTimeString()（带秒）作为时间部分。
+  return `${mm}-${dd} ${date.toLocaleTimeString()}`
 }
 
 // 匹配 http(s)://、mailto:、tel: 开头的 URL，遇到空白或引号/尖括号结尾。
@@ -276,6 +279,9 @@ function toggleLevel(level: string | null) {
 }
 
 .dashboard-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   background: white;
   padding: 16px 24px;
   display: flex;
@@ -486,7 +492,9 @@ function toggleLevel(level: string | null) {
 
 .notification-body {
   font-size: 12px;
-  color: #444;
+  /* 背景为 Catppuccin Mocha base（深色），默认文字需用同调色板的 text 色 #cdd6f4，
+     否则纯文本内容与深色背景对比度过低而看不见；JSON 高亮各色同样基于此调色板。 */
+  color: #cdd6f4;
   line-height: 1.6;
   word-break: break-word;
   white-space: pre-wrap;
