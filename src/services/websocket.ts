@@ -79,24 +79,28 @@ class WebSocketService {
     return wsUrl
   }
 
+  // 后端实时推送（response）与历史拉取（history）现在共用同一份 DB 行结构
+  // （{id, digest, title, content, level_name, created_at, updated_at}）。
+  // 抽出统一映射，保证两条路径产出的 Notification 字段一致，前端可凭真实 id 去重。
+  private rowToNotification(item: any): Notification {
+    return {
+      id: Number(item.id ?? Date.now()),
+      digest: String(item.digest ?? ''),
+      title: String(item.title ?? item.message ?? 'Notification'),
+      content: typeof item.content === 'string' ? item.content : JSON.stringify(item.content ?? item),
+      level_name: String(item.level_name ?? 'NOTIFY'),
+      created_at: String(item.created_at ?? new Date().toISOString()),
+      updated_at: String(item.updated_at ?? item.created_at ?? new Date().toISOString())
+    }
+  }
+
   private handleMessage(message: WSMessage) {
     if (message.type === 'response') {
-      const payload = message.data || {}
-      const notification: Notification = {
-        id: Date.now(),
-        digest: '',
-        title: payload.message || payload.title || 'Notification',
-        content: JSON.stringify(payload),
-        // 日志响应一定带 level_name；自定义通知（/notifications）的响应体只有
-        // title/content，缺失 level_name 时按后端入库逻辑归类为 NOTIFY。
-        level_name: payload.level_name || 'NOTIFY',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
+      // 后端 respond 现在推送插入后的完整 DB 行（data 即该行）。
+      const notification = this.rowToNotification(message.data || {})
       this.notifyMessageHandlers(notification)
-      const body = payload.message ?? payload.content ?? payload
-      const notifBody = typeof body === 'string' ? body : JSON.stringify(body)
-      sendSystemNotification(notification.title, notifBody)
+      // 系统通知正文用 content（原始文本），title 用 DB 的 title。
+      sendSystemNotification(notification.title, notification.content)
     } else if (message.type === 'aggregate') {
       // 服务端当前把 aggregate 字段放在顶层，兼容旧文档里的 data 结构。
       const agg = (message.data && typeof message.data === 'object') ? message.data : message as any
@@ -111,16 +115,7 @@ class WebSocketService {
     } else if (message.type === 'history') {
       const items = Array.isArray(message.data) ? message.data : []
       items.forEach((item) => {
-        const notification: Notification = {
-          id: Number(item.id ?? Date.now()),
-          digest: String(item.digest ?? ''),
-          title: String(item.title ?? item.message ?? 'Notification'),
-          content: typeof item.content === 'string' ? item.content : JSON.stringify(item.content ?? item),
-          level_name: String(item.level_name ?? 'NOTIFY'),
-          created_at: String(item.created_at ?? new Date().toISOString()),
-          updated_at: String(item.updated_at ?? item.created_at ?? new Date().toISOString())
-        }
-        this.notifyMessageHandlers(notification)
+        this.notifyMessageHandlers(this.rowToNotification(item))
       })
     }
   }

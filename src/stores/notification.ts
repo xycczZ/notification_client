@@ -45,9 +45,8 @@ export const useNotificationStore = defineStore('notification', () => {
       unsubscribeConnection?.()
 
       unsubscribeMessage = websocketService.onMessage((notification) => {
-        // 带真实 DB id 的 Notification 可能由 history 拉取与实时推送重复到达，
-        // 用 id 去重；aggregate 无 id，不参与去重。实时通知用的是 Date.now()，
-        // 不会与 DB 真实 id 冲突。
+        // 带 id 的 Notification（实时 response 与历史 history 共用同一 DB 行结构）
+        // 可能重复到达，用真实 DB id 去重；aggregate 无 id，不参与去重，直接展示。
         if ('id' in notification) {
           if (notifications.value.some(n => 'id' in n && n.id === notification.id)) {
             return
